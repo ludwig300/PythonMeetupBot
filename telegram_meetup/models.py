@@ -17,16 +17,19 @@ class User(models.Model):
         verbose_name='Username в Telegram',
         unique=True,
         db_index=True,
+        max_length=30
     )
     firstname = models.CharField(
         verbose_name='Имя',
         blank=True,
         default='',
+        max_length=20
     )
     lastname = models.CharField(
         verbose_name='Фамилия',
         blank=True,
         default='',
+        max_length=20
     )
     occupation = models.TextField(
         verbose_name='Чем занимаешься?',
@@ -71,7 +74,8 @@ class Report(models.Model):
     event = models.ForeignKey(
         Event, related_name='reports',
         verbose_name='Мероприятие',
-        on_delete=models.SET_NULL
+        on_delete=models.SET_NULL,
+        null=True
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
