@@ -41,6 +41,9 @@ class User(models.Model):
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
 
+    def __str__(self):
+        return self.username
+
 
 class Event(models.Model):
     title = models.CharField(
@@ -84,6 +87,9 @@ class Report(models.Model):
         verbose_name = 'Доклад'
         verbose_name_plural = 'Доклады'
 
+    def __str__(self):
+        return self.title
+
 
 class Question(models.Model):
     user = models.ForeignKey(
@@ -105,3 +111,6 @@ class Question(models.Model):
     class Meta:
         verbose_name = 'Вопрос'
         verbose_name_plural = 'Вопросы'
+
+    def __str__(self):
+        return f"Question from {self.user.username} for report {self.report.title}"
