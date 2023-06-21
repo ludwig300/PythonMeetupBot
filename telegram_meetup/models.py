@@ -34,6 +34,10 @@ class User(models.Model):
         default='',
     )
 
+    class Meta:
+        verbose_name = 'Пользователь'
+        verbose_name_plural = 'Пользователи'
+
 
 class Event(models.Model):
     title = models.CharField(
@@ -43,6 +47,10 @@ class Event(models.Model):
     date = models.DateField(verbose_name='Дата мероприятия')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Мероприятие'
+        verbose_name_plural = 'Мероприятия'
 
 
 class Report(models.Model):
@@ -68,6 +76,10 @@ class Report(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        verbose_name = 'Доклад'
+        verbose_name_plural = 'Доклады'
+
 
 class Question(models.Model):
     user = models.ForeignKey(
@@ -85,3 +97,7 @@ class Question(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Вопрос'
+        verbose_name_plural = 'Вопросы'
