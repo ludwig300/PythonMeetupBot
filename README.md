@@ -21,7 +21,7 @@ pip3 install -r requirements.txt
 ## Настройка переменных окружения
 Пример .env файла
 
-``
+```
 SECRET_KEY=django-insecure-&%pb8r^9+!lk3rl%is#iz
 DEBUG=False
 ALLOWED_HOSTS='0.0.0.0.0'
