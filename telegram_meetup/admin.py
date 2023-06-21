@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, Event, Report, Question
+from telegram_meetup.models import User, Event, Report, Question
 
 
 @admin.register(User)
