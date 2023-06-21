@@ -40,7 +40,6 @@ def start(update: Update, context: CallbackContext) -> None:
             user.firstname = update.message.from_user.first_name
             user.lastname = update.message.from_user.last_name
             user.save()
-        logger.info(update.callback_query.from_user.username)
     else:
         user, created = User.objects.get_or_create(
             username=update.callback_query.from_user.username,
@@ -53,7 +52,6 @@ def start(update: Update, context: CallbackContext) -> None:
             user.firstname = update.callback_query.from_user.first_name
             user.lastname = update.callback_query.from_user.last_name
             user.save()
-        logger.info(update.callback_query.from_user.username)
 
     keyboard = [
         [InlineKeyboardButton("Расписание выступлений", callback_data='schedule')],
