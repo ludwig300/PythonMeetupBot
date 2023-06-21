@@ -15,6 +15,7 @@ django.setup()
 
 from telegram_meetup.models import Question, Report, User
 
+FILLING_FORM = 0
 ASKING_QUESTION = 1
 
 logging.basicConfig(
@@ -148,6 +149,73 @@ def receive_question(update: Update, context: CallbackContext) -> None:
     return ConversationHandler.END
 
 
+def show_username(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    user_id = context.user_data['current_profile']
+    user = User.objects.get(id=user_id)
+
+    text = f"Username: @{user.username}"
+    query.message.reply_text(text)
+
+
+def next_profile(update: Update, context: CallbackContext) -> None:
+    meetup(update, context)
+
+
+def meetup(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    user, _ = User.objects.get_or_create(
+        username=query.from_user.username
+    )
+
+    if not user.occupation:
+        text = "Привет! Рады, что вы хотите познакомиться. Напишите немного о себе."
+        keyboard = [
+            [InlineKeyboardButton("Заполнить анкету", callback_data='fill_form')],
+            [InlineKeyboardButton("Главное меню", callback_data='start')]
+        ]
+    else:
+        current_profile_id = context.user_data.get('current_profile')
+        other_users = User.objects.exclude(username=user.username).filter(occupation__isnull=False)
+        if current_profile_id:
+            other_users = other_users.exclude(id=current_profile_id)
+        
+        other_user = other_users.order_by('?').first()
+
+        if other_user:
+            context.user_data['current_profile'] = other_user.id
+            text = f"Имя: {other_user.firstname}\nПрофессия: {other_user.occupation}"
+            keyboard = [
+                [InlineKeyboardButton("Показать username", callback_data='show_username')],
+                [InlineKeyboardButton("Показать другую анкету", callback_data='next_profile')],
+                [InlineKeyboardButton("Главное меню", callback_data='start')]
+            ]
+        else:
+            text = "Извините, но у нас пока нет других анкет для показа."
+            keyboard = [[InlineKeyboardButton("Главное меню", callback_data='start')]]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    query.message.edit_text(text, reply_markup=reply_markup)
+
+
+def fill_form(update: Update, context: CallbackContext) -> int:
+    query = update.callback_query
+    query.message.reply_text('Пожалуйста, введите вашу профессию:')
+    return FILLING_FORM
+
+
+def receive_occupation(update: Update, context: CallbackContext) -> int:
+    user, _ = User.objects.get_or_create(
+        username=update.message.from_user.username
+    )
+
+    user.occupation = update.message.text
+    user.save()
+
+    update.message.reply_text('Спасибо! Ваша профессия была сохранена.')
+    return ConversationHandler.END
+
+
 def button(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
 
@@ -204,10 +272,18 @@ def main() -> None:
     logger.info("Starting the bot...")
     updater.dispatcher.add_handler(CommandHandler('start', start))
     updater.dispatcher.add_handler(CallbackQueryHandler(speaker_questions, pattern='^speaker_questions$'))
-
+    updater.dispatcher.add_handler(CallbackQueryHandler(meetup, pattern='^meetup$'))
+    updater.dispatcher.add_handler(CallbackQueryHandler(show_username, pattern='^show_username$'))
+    updater.dispatcher.add_handler(CallbackQueryHandler(next_profile, pattern='^next_profile$'))
     conv_handler = ConversationHandler(
-        entry_points=[CallbackQueryHandler(ask_question, pattern='^ask_[0-9]+$')],
+        entry_points=[
+            CallbackQueryHandler(fill_form, pattern='^fill_form$'),
+            CallbackQueryHandler(ask_question, pattern='^ask_[0-9]+$')],
         states={
+            FILLING_FORM: [
+                MessageHandler(Filters.text & ~Filters.command, receive_occupation)
+            ],
+
             ASKING_QUESTION: [
                 MessageHandler(Filters.text & ~Filters.command, receive_question)
             ],
