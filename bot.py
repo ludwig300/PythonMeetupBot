@@ -16,6 +16,7 @@ django.setup()
 from telegram_meetup.models import Question, Report, User
 
 ASKING_QUESTION = 1
+ANSWERING_QUESTION = 2
 
 
 logging.basicConfig(
@@ -27,32 +28,49 @@ logger = logging.getLogger(__name__)
 
 
 def start(update: Update, context: CallbackContext) -> None:
-    user, created = User.objects.get_or_create(
-        username=update.message.from_user.username,
-        defaults={
-            'firstname': update.message.from_user.first_name,
-            'lastname': update.message.from_user.last_name,
-        }
-    )
-    if not created:
-        user.firstname = update.message.from_user.first_name
-        user.lastname = update.message.from_user.last_name
-        user.save()
+    if update.message:
+        user, created = User.objects.get_or_create(
+            username=update.message.from_user.username,
+            defaults={
+                'firstname': update.message.from_user.first_name,
+                'lastname': update.message.from_user.last_name,
+            }
+        )
+        if not created:
+            user.firstname = update.message.from_user.first_name
+            user.lastname = update.message.from_user.last_name
+            user.save()
+        logger.info(update.callback_query.from_user.username)
+    else:
+        user, created = User.objects.get_or_create(
+            username=update.callback_query.from_user.username,
+            defaults={
+                'firstname': update.callback_query.from_user.first_name,
+                'lastname': update.callback_query.from_user.last_name,
+            }
+        )
+        if not created:
+            user.firstname = update.callback_query.from_user.first_name
+            user.lastname = update.callback_query.from_user.last_name
+            user.save()
+        logger.info(update.callback_query.from_user.username)
 
     keyboard = [
         [InlineKeyboardButton("Расписание выступлений", callback_data='schedule')],
         [InlineKeyboardButton("Хочу познакомиться", callback_data='meetup')],
-        [InlineKeyboardButton("Вопросы к докладчику", callback_data='speaker_questions')],
-        [InlineKeyboardButton("Донат организатору", callback_data='donate')],
+        [InlineKeyboardButton("Донат организатору", callback_data='donate')]
     ]
+    if user.role == 'Speaker':
+        keyboard.append([InlineKeyboardButton("Вопросы к докладчику", callback_data='speaker_questions')])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-
+    text = f'Добро пожаловать {user.firstname}.\n' \
+            f'Ваша роль - {user.get_role_display()}\n' \
+            'Главное меню:'
     if update.message:
-        update.message.reply_text('Главное меню:', reply_markup=reply_markup)
+        update.message.reply_text(text, reply_markup=reply_markup)
     else:
-        update.callback_query.message.edit_text('Главное меню:', reply_markup=reply_markup)
-    logger.info(update.message.from_user.username)
+        update.callback_query.message.edit_text(text, reply_markup=reply_markup)
 
 
 def get_speakers_schedule():
@@ -160,20 +178,46 @@ def button(update: Update, context: CallbackContext) -> None:
         start(update, context)
 
 
-def cancel(update: Update, context: CallbackContext) -> int:
-    start(update, context)
+def speaker_questions(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    speaker = User.objects.get(username=query.from_user.username)
+    questions = Question.objects.filter(report__speaker=speaker)
+    text = "Вам еще не задали ни одного вопроса"
+
+    if questions.exists():
+        text = "Вопросы к вам:\n\n"
+        for q in questions:
+            text += f"- {q.user.firstname} {q.user.lastname} @{q.user.username}: {q.question}\n"
+        keyboard = [[InlineKeyboardButton("Назад", callback_data='start')]]
+    else:
+        keyboard = [[InlineKeyboardButton("Назад", callback_data='start')]]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    query.message.edit_text(text, reply_markup=reply_markup)
+
+
+def reply_question(update: Update, context: CallbackContext) -> int:
+    query = update.callback_query
+    question_id = int(query.data.split('_')[1])
+    context.user_data['question_id'] = question_id
+    query.message.reply_text('Пожалуйста, введите ваш ответ:')
+    return ANSWERING_QUESTION
+
+
+def receive_answer(update: Update, context: CallbackContext) -> None:
+    question_id = context.user_data['question_id']
+    question = Question.objects.get(id=question_id)
+
+    # Здесь вы можете отправить ответ на вопрос через API Telegram
+    # Например, используя `context.bot.send_message()`
+
+    update.message.reply_text('Ваш ответ был отправлен.')
     return ConversationHandler.END
 
 
-conv_handler = ConversationHandler(
-    entry_points=[CallbackQueryHandler(ask_question, pattern='^ask_[0-9]+$')],
-    states={
-        ASKING_QUESTION: [
-            MessageHandler(Filters.text & ~Filters.command, receive_question)
-        ]
-    },
-    fallbacks=[CommandHandler('cancel', cancel)],
-)
+def cancel(update: Update, context: CallbackContext) -> int:
+    start(update, context)
+    return ConversationHandler.END
 
 
 def main() -> None:
@@ -182,6 +226,23 @@ def main() -> None:
     updater = Updater(tg_token, use_context=True)
     logger.info("Starting the bot...")
     updater.dispatcher.add_handler(CommandHandler('start', start))
+    updater.dispatcher.add_handler(CallbackQueryHandler(speaker_questions, pattern='^speaker_questions$'))
+    updater.dispatcher.add_handler(CallbackQueryHandler(reply_question, pattern='^reply_[0-9]+$'))
+
+    conv_handler = ConversationHandler(
+        entry_points=[CallbackQueryHandler(ask_question, pattern='^ask_[0-9]+$'),
+                      CallbackQueryHandler(reply_question, pattern='^reply_[0-9]+$')],
+        states={
+            ASKING_QUESTION: [
+                MessageHandler(Filters.text & ~Filters.command, receive_question)
+            ],
+            ANSWERING_QUESTION: [
+                MessageHandler(Filters.text & ~Filters.command, receive_answer)
+            ]
+        },
+        fallbacks=[CommandHandler('cancel', cancel)],
+    )
+
     updater.dispatcher.add_handler(conv_handler)
     updater.dispatcher.add_handler(CallbackQueryHandler(button))
 
