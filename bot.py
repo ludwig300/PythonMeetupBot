@@ -27,6 +27,18 @@ logger = logging.getLogger(__name__)
 
 
 def start(update: Update, context: CallbackContext) -> None:
+    user, created = User.objects.get_or_create(
+        username=update.message.from_user.username,
+        defaults={
+            'firstname': update.message.from_user.first_name,
+            'lastname': update.message.from_user.last_name,
+        }
+    )
+    if not created:
+        user.firstname = update.message.from_user.first_name
+        user.lastname = update.message.from_user.last_name
+        user.save()
+
     keyboard = [
         [InlineKeyboardButton("Расписание выступлений", callback_data='schedule')],
         [InlineKeyboardButton("Хочу познакомиться", callback_data='meetup')],
