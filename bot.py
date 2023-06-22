@@ -4,8 +4,7 @@ import os
 import django
 from django.utils import timezone
 from dotenv import load_dotenv
-from telegram import (InlineKeyboardButton, InlineKeyboardMarkup,
-                      ReplyKeyboardRemove, Update)
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (CallbackContext, CallbackQueryHandler,
                           CommandHandler, ConversationHandler, Filters,
                           MessageHandler, Updater)
