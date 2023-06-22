@@ -17,16 +17,19 @@ class User(models.Model):
         verbose_name='Username в Telegram',
         unique=True,
         db_index=True,
+        max_length=255,
     )
     firstname = models.CharField(
         verbose_name='Имя',
         blank=True,
         default='',
+        max_length=60,
     )
     lastname = models.CharField(
         verbose_name='Фамилия',
         blank=True,
         default='',
+        max_length=100,
     )
     occupation = models.TextField(
         verbose_name='Чем занимаешься?',
@@ -37,6 +40,9 @@ class User(models.Model):
     class Meta:
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
+
+    def __str__(self):
+        return f'{self.firstname} {self.lastname} ({self.username})'
 
 
 class Event(models.Model):
@@ -51,6 +57,9 @@ class Event(models.Model):
     class Meta:
         verbose_name = 'Мероприятие'
         verbose_name_plural = 'Мероприятия'
+
+    def __str__(self):
+        return self.title
 
 
 class Report(models.Model):
@@ -69,9 +78,10 @@ class Report(models.Model):
     )
     datetime = models.DateTimeField(verbose_name='Время выступления')
     event = models.ForeignKey(
-        Event, related_name='reports',
+        Event,
+        related_name='reports',
         verbose_name='Мероприятие',
-        on_delete=models.SET_NULL
+        on_delete=models.CASCADE,
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -79,6 +89,9 @@ class Report(models.Model):
     class Meta:
         verbose_name = 'Доклад'
         verbose_name_plural = 'Доклады'
+
+    def __str__(self):
+        return f'{self.title} ({self.speaker.firstname} {self.speaker.lastname})'
 
 
 class Question(models.Model):
@@ -101,3 +114,6 @@ class Question(models.Model):
     class Meta:
         verbose_name = 'Вопрос'
         verbose_name_plural = 'Вопросы'
+
+    def __str__(self):
+        return self.question

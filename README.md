@@ -27,6 +27,7 @@ DEBUG=False
 ALLOWED_HOSTS='0.0.0.0.0'
 TELEGRAM_TOKEN=65520:AAExux2WuW-GnfEzvAxEgan0g7o
 ```
+
 SECRET_KEY - Секретный ключ Django, можно сгенерировать
 DEBUG - Настройка DEBUG режима. Для "боевого" режима ставим False
 ALLOWED_HOSTS - IP адресс или адресс сайта, где будет опубликован проект
