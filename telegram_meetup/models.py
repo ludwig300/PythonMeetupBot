@@ -19,6 +19,10 @@ class User(models.Model):
         db_index=True,
         max_length=30
     )
+    chat_id = models.IntegerField(
+        verbose_name='ID чата в Telegram',
+        unique=True
+    )
     firstname = models.CharField(
         verbose_name='Имя',
         blank=True,
@@ -57,6 +61,9 @@ class Event(models.Model):
     class Meta:
         verbose_name = 'Мероприятие'
         verbose_name_plural = 'Мероприятия'
+
+    def __str__(self):
+        return self.title
 
 
 class Report(models.Model):
