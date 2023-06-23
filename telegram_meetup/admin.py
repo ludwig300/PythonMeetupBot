@@ -25,5 +25,5 @@ class ReportAdmin(admin.ModelAdmin):
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
     list_display = ('user', 'question', 'report', 'created_at')
-    list_filter = ('user', 'report')
+    list_filter = ('report__event', 'report', 'report__speaker')
     search_fields = ('question',)
