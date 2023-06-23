@@ -14,7 +14,7 @@ from make_qr import generate_qr
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'python_meetup_bot.settings')
 django.setup()
 
-from telegram_meetup.models import Question, Report, User
+from telegram_meetup.models import Question, Report, User, Event
 
 FILLING_FORM = 0
 ASKING_QUESTION = 1
@@ -26,6 +26,20 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+
+def get_events():
+    events = Event.objects.all()
+    return [{'id': event.id, 'name': event.title} for event in events]
+
+
+def show_events(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    events = get_events()
+    keyboard = [[InlineKeyboardButton(event['name'], callback_data=f"event_{event['id']}")] for event in events]
+    keyboard.append([InlineKeyboardButton("Главное меню", callback_data='start')])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    query.edit_message_text('Выберите мероприятие:', reply_markup=reply_markup)
 
 
 def broadcast_command(update: Update, context: CallbackContext) -> None:
@@ -53,7 +67,8 @@ def donate(update: Update, _: CallbackContext) -> None:
             InlineKeyboardButton("Visa/Mastercard", callback_data='pay_card'),
             InlineKeyboardButton("Bitcoin", callback_data='pay_btc'),
             InlineKeyboardButton("USDT(TRC-20)", callback_data='pay_usdt')
-        ]
+        ],
+        [InlineKeyboardButton("Главное меню", callback_data='start')]
     ]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -68,7 +83,9 @@ def pay_card(update: Update, context: CallbackContext):
     query = update.callback_query
     query.answer()
     visa_mastercard = context.bot_data['visa_mastercard']
-    query.edit_message_text(f"Пожалуйста, переведите свой донат на следующий номер карты: {visa_mastercard}")
+    keyboard = [[InlineKeyboardButton("Главное меню", callback_data='start')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    query.edit_message_text(f"Пожалуйста, переведите свой донат на следующий номер карты: {visa_mastercard}", reply_markup=reply_markup)
 
 
 def pay_btc(update: Update, context: CallbackContext):
@@ -80,8 +97,9 @@ def pay_btc(update: Update, context: CallbackContext):
 
     with open('btc_qr.png', 'rb') as f:
         update.callback_query.message.reply_photo(f)
-
-    query.edit_message_text("Пожалуйста, переведите свой донат на следующий Bitcoin адрес: " + btc_address)
+    keyboard = [[InlineKeyboardButton("Главное меню", callback_data='start')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    query.edit_message_text("Пожалуйста, переведите свой донат на следующий Bitcoin адрес: " + btc_address, reply_markup=reply_markup)
 
 
 def pay_usdt(update: Update, context: CallbackContext):
@@ -93,8 +111,9 @@ def pay_usdt(update: Update, context: CallbackContext):
 
     with open('usdt_qr.png', 'rb') as f:
         update.callback_query.message.reply_photo(f)
-
-    query.edit_message_text("Пожалуйста, переведите свой донат на следующий USDT(TRC-20) адрес: " + usdt_address)
+    keyboard = [[InlineKeyboardButton("Главное меню", callback_data='start')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    query.edit_message_text("Пожалуйста, переведите свой донат на следующий USDT(TRC-20) адрес: " + usdt_address, reply_markup=reply_markup)
 
 
 def start(update: Update, context: CallbackContext) -> None:
@@ -129,10 +148,7 @@ def start(update: Update, context: CallbackContext) -> None:
             user.save()
 
     keyboard = [
-        [InlineKeyboardButton(
-            "Расписание выступлений",
-            callback_data='schedule'
-        )],
+        [InlineKeyboardButton("Мероприятия", callback_data='events')],
         [InlineKeyboardButton("Хочу познакомиться", callback_data='meetup')],
         [InlineKeyboardButton("Донат организатору", callback_data='donate')]
     ]
@@ -161,9 +177,9 @@ def start(update: Update, context: CallbackContext) -> None:
         )
 
 
-def get_speakers_schedule():
+def get_speakers_schedule(event_id):
     schedule = []
-    reports = Report.objects.filter(datetime__gte=timezone.now()).order_by('datetime')
+    reports = Report.objects.filter(event=event_id, datetime__gte=timezone.now()).order_by('datetime')
 
     for report in reports:
         schedule.append({
@@ -178,8 +194,8 @@ def get_speakers_schedule():
 
 def schedule(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
-
-    schedule = get_speakers_schedule()
+    event_id = query.data.split('_')[1]
+    schedule = get_speakers_schedule(event_id)
 
     if schedule:
         text = 'Выберите доклад:'
@@ -190,10 +206,10 @@ def schedule(update: Update, context: CallbackContext) -> None:
             )]
             for s in schedule
         ]
-        keyboard.append([InlineKeyboardButton("Назад", callback_data='start')])
+        keyboard.append([InlineKeyboardButton("Назад", callback_data='events')])
     else:
         text = "В ближайшее время выступлений не запланировано"
-        keyboard = [[InlineKeyboardButton("Назад", callback_data='start')]]
+        keyboard = [[InlineKeyboardButton("Назад", callback_data='events')]]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -214,7 +230,7 @@ def report(update: Update, context: CallbackContext, report_id: int) -> None:
             "Задать вопрос",
             callback_data=f"ask_{report_id}"
         )],
-        [InlineKeyboardButton("Назад", callback_data='schedule')]
+        [InlineKeyboardButton("Главное меню", callback_data='start')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -320,7 +336,10 @@ def receive_occupation(update: Update, context: CallbackContext) -> int:
     user.occupation = update.message.text
     user.save()
 
-    update.message.reply_text('Спасибо! Ваша профессия была сохранена.')
+    keyboard = [[InlineKeyboardButton("Хочу познакомиться", callback_data='meetup')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    update.message.reply_text('Спасибо! Ваша профессия была сохранена.', reply_markup=reply_markup)
     return ConversationHandler.END
 
 
@@ -400,6 +419,9 @@ def main() -> None:
     updater.dispatcher.add_handler(
         CallbackQueryHandler(pay_usdt, pattern='^pay_usdt$')
     )
+    updater.dispatcher.add_handler(CallbackQueryHandler(show_events, pattern='^events$'))
+    updater.dispatcher.add_handler(CallbackQueryHandler(schedule, pattern='^event_[0-9]+$'))
+
     conv_handler = ConversationHandler(
         entry_points=[
             CallbackQueryHandler(fill_form, pattern='^fill_form$'),
