@@ -40,6 +40,7 @@ class User(models.Model):
         blank=True,
         default='',
     )
+    photo = models.ImageField(upload_to='user_photos/', null=True, blank=True)
 
     class Meta:
         verbose_name = 'Пользователь'

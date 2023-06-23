@@ -2,6 +2,7 @@ import logging
 import os
 
 import django
+from django.core.files import File
 from django.utils import timezone
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -14,11 +15,12 @@ from make_qr import generate_qr
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'python_meetup_bot.settings')
 django.setup()
 
-from telegram_meetup.models import Question, Report, User, Event
+from telegram_meetup.models import Event, Question, Report, User
 
 FILLING_FORM = 0
 ASKING_QUESTION = 1
 BROADCASTING = 2
+UPLOADING_PHOTO = 3
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -301,6 +303,10 @@ def meetup(update: Update, context: CallbackContext) -> None:
         if other_user:
             context.user_data['current_profile'] = other_user.id
             text = f"Имя: {other_user.firstname}\nПрофессия: {other_user.occupation}"
+
+            if other_user.photo:
+                query.message.reply_photo(other_user.photo)
+
             keyboard = [
                 [InlineKeyboardButton(
                     "Показать username",
@@ -319,7 +325,7 @@ def meetup(update: Update, context: CallbackContext) -> None:
             ]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    query.message.edit_text(text, reply_markup=reply_markup)
+    query.message.reply_text(text, reply_markup=reply_markup)
 
 
 def fill_form(update: Update, context: CallbackContext) -> int:
@@ -336,10 +342,32 @@ def receive_occupation(update: Update, context: CallbackContext) -> int:
     user.occupation = update.message.text
     user.save()
 
+    keyboard = [[InlineKeyboardButton("Загрузить фото", callback_data='upload_photo')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    update.message.reply_text('Спасибо! Ваша профессия была сохранена. Теперь вы можете загрузить фотографию.', reply_markup=reply_markup)
+    return ConversationHandler.END
+
+
+def upload_photo(update: Update, context: CallbackContext) -> int:
+    query = update.callback_query
+    query.message.reply_text('Пожалуйста, отправьте вашу фотографию.')
+    return UPLOADING_PHOTO
+
+
+def receive_photo(update: Update, context: CallbackContext) -> int:
+    user = User.objects.get(username=update.message.from_user.username)
+
+    photo_file = update.message.photo[-1].get_file()
+    photo_file.download('user_photo.jpg')
+
+    with open('user_photo.jpg', 'rb') as f:
+        user.photo.save('user_photo.jpg', File(f))
+
     keyboard = [[InlineKeyboardButton("Хочу познакомиться", callback_data='meetup')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    update.message.reply_text('Спасибо! Ваша профессия была сохранена.', reply_markup=reply_markup)
+    update.message.reply_text('Спасибо! Ваша фотография была сохранена.', reply_markup=reply_markup)
     return ConversationHandler.END
 
 
@@ -426,13 +454,17 @@ def main() -> None:
         entry_points=[
             CallbackQueryHandler(fill_form, pattern='^fill_form$'),
             CallbackQueryHandler(ask_question, pattern='^ask_[0-9]+$'),
-            CallbackQueryHandler(broadcast_command, pattern='^broadcast$')
+            CallbackQueryHandler(broadcast_command, pattern='^broadcast$'),
+            CallbackQueryHandler(upload_photo, pattern='^upload_photo$'),
         ],
         states={
             FILLING_FORM: [
                 MessageHandler(
                     Filters.text & ~Filters.command, receive_occupation
                 )
+            ],
+            UPLOADING_PHOTO: [
+                MessageHandler(Filters.photo, receive_photo)
             ],
 
             ASKING_QUESTION: [
