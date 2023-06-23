@@ -24,12 +24,12 @@ env.read_env()
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env("SECRET_KEY")
+SECRET_KEY = env('SECRET_KEY', 'django-insecure-&%pb8r^9+!lk3rl%is#iz')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env("DEBUG")
+DEBUG = env.bool('DEBUG', False)
 
-ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', '127.0.0.1')
 
 
 # Application definition
